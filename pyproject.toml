@@ -1,0 +1,16 @@
+[project]
+name = "rocq-dash-docset"
+version = "0.1.0"
+description = "Build a Dash docset from the Rocq reference manual"
+requires-python = ">=3.11"
+dependencies = [
+    "antlr4-python3-runtime==4.7.1",
+    "beautifulsoup4>=4.10",
+    "doc2dash==3.1.0",
+    "pexpect>=4.8",
+    "pyyaml>=6.0.2",
+    "setuptools<81",
+    "sphinx==8.2.3",
+    "sphinx-rtd-theme==3.0.2",
+    "sphinxcontrib-bibtex==2.6.3",
+]

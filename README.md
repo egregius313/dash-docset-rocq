@@ -1,23 +1,74 @@
-### What is this?
+# Rocq Dash docset
 
-[Coq Proof Assistant](https://coq.inria.fr/) docset for [Dash](https://kapeli.com/dash) and their clones (e.g. [Zeal](https://zealdocs.org/)).
+This project builds a [Rocq Prover](https://rocq-prover.org/) reference-manual
+docset for [Dash](https://kapeli.com/dash) and compatible browsers such as
+[Zeal](https://zealdocs.org/). It targets Rocq 9.2.0 by default.
 
-The artifacts are uploaded to [User Contributions of Dash](https://github.com/Kapeli/Dash-User-Contributions/tree/master/docsets/Coq).
+## Prerequisites
 
+- [NuShell](https://www.nushell.sh/).
+- [Podman](https://podman.io/) or Docker. The build script uses Podman when it
+  is available and otherwise falls back to Docker.
+- [`uv`](https://docs.astral.sh/uv/) only when modifying the Python
+  dependencies.
 
-### Prerequiremens
-- `docker` for building docset.
+## Build
 
-### How to build
-Run `./build.sh`.
+Build the default Rocq 9.2.0 docset:
 
-If you need to update `pip` package versions, you can add constraints in `requirements.in` and run `./pipcompile.sh` to generate a new `requirements.txt` (though you will need `python3` installed locally).
+```sh
+nu build.nu
+```
 
-### What is this doing?
-As of [Coq version 8.8.0](https://github.com/coq/coq/releases/tag/V8.8.0), they migrated document tool from LaTeX to Sphinx. Therefore now we can use [doc2dash](https://doc2dash.readthedocs.io/en/stable/) which can generate Dash docset from Sphix document.
+Pass a release version to build a different supported Rocq release:
 
-However, we need two tweaks for using this tool to gerenate Dash docset from Coq's document.
+```sh
+nu build.nu 9.2.0
+```
 
-First, default Sphinx theme of Coq's document is [sphinx_rdt_theme](https://github.com/rtfd/sphinx_rtd_theme), which seems no option to disable sidebar. Hence we had to recompile the document with `SPHINXOPTS="-Dhtml_theme=alabaster -Dhtml_theme_options.nosidebar=true"`
+Set `CONTAINER_ENGINE` to choose an installed OCI engine explicitly:
 
-Second, default sphinx parser of doc2dash only supports [general directive type](https://github.com/hynek/doc2dash/blob/ff16a7591a9ed0a9711a52b13699f94b48e8a9b1/src/doc2dash/parsers/intersphinx.py#L15-L35) which differs from that of Coq. To solve the problem, we wrote [small parser](https://github.com/pjmtdw/dash-docset-coq/blob/master/coq_parser.py) which supports directive type of Coq.
+```sh
+CONTAINER_ENGINE=docker nu build.nu
+```
+
+The resulting docset is written to:
+
+```text
+build/dash-docset-rocq-<version>/Rocq.docset
+```
+
+For the default release, this is
+`build/dash-docset-rocq-9.2.0/Rocq.docset`. The build leaves its container
+image in place for reuse and removes its temporary container automatically.
+
+## Update Python dependencies
+
+Add or remove dependencies with `uv`, which updates both `pyproject.toml` and
+the committed `uv.lock`:
+
+```sh
+uv add <package>
+uv remove <package>
+```
+
+To update locked dependency versions without changing the project requirements,
+run:
+
+```sh
+uv lock --upgrade
+```
+
+## How it works
+
+Rocq builds its reference manual with Sphinx. The container downloads the
+requested `rocq-prover/rocq` release, builds the manual with
+`make refman-html`, and converts `_build/default/doc/refman-html` with
+[doc2dash](https://doc2dash.hynek.me/).
+
+`coq_parser.py` maps Rocq's custom Sphinx inventory roles (`rocq:*`) to
+Dash-compatible search entry types so Rocq commands, tactics, options, errors,
+and standard Sphinx entries are searchable in the resulting docset.
+
+To distribute a release, submit `Rocq.docset` as a new Rocq docset to
+[Dash User Contributions](https://github.com/Kapeli/Dash-User-Contributions/tree/master/docsets).

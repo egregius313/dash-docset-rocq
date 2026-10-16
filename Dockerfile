@@ -1,26 +1,43 @@
-FROM fedora:33
+FROM ocaml/opam:debian-12-ocaml-4.14 AS build
 
-# ocaml-camlp5-devel seems not required by current master branch of Coq
-RUN dnf -y --setopt=install_weak_deps=False install findutils make ocaml ocaml-num-devel \
-                    ocaml-findlib python3 python3-setuptools python3-pip ocaml-camlp5-devel ocaml-zarith-devel
+USER root
 
-COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install -r /tmp/requirements.txt
+RUN apt-get update -qq && apt-get install --no-install-recommends -y -qq \
+        build-essential \
+        ca-certificates \
+        libgmp-dev \
+        make \
+        python3 \
+        python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:0.12.23 /uv /uvx /bin/
+
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+COPY pyproject.toml uv.lock /tmp/project/
+WORKDIR /tmp/project
+RUN uv sync --locked --no-dev --no-install-project --no-cache
+ENV PATH="/opt/venv/bin:${PATH}"
+
+ARG ROCQ_VER=9.2.0
+
+ADD https://github.com/rocq-prover/rocq/archive/refs/tags/V${ROCQ_VER}.tar.gz rocq.tar.gz
+RUN mkdir /rocq && tar zxf rocq.tar.gz -C /rocq --strip-components=1 \
+    && chown -R opam:opam /rocq
+
+USER opam
+WORKDIR /rocq
+
+RUN eval "$(opam env)" && opam install --yes dune.3.23.1 ocamlfind zarith
+
+FROM build AS refman
+
+RUN LANG=C.UTF-8 LC_ALL=C.UTF-8 eval "$(opam env)" && make refman-html
+
+FROM refman AS docset
 
 COPY coq_parser.py /store/
 
-ARG COQ_VER=8.13.0
-
-ADD https://github.com/coq/coq/archive/V${COQ_VER}.tar.gz coq.tar.gz
-RUN mkdir /coq && tar zxf coq.tar.gz -C /coq --strip-components=1
-
-WORKDIR /coq
-
-# consider using -no-ask option which is added in recent coq, instead of specifing all options
-RUN ./configure -prefix /usr -mandir /usr/share/man -configdir /etc/xdg/coq/ -coqide no -with-doc yes
-
-# Default sphinx theme for coq which is sphinx_rtd_theme, seems no way to disable sidebar, so we use alabaster instead
-RUN make -j4 SPHINXOPTS="-Dhtml_theme=alabaster -Dhtml_theme_options.nosidebar=true" doc-html
-
-RUN LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONPATH=/store/ doc2dash -n Coq -i ./ide/coqide/coq.png \
-         --parser coq_parser.CoqSphinxParser ./doc/sphinx/_build/html
+RUN find _build/default/doc/refman-html -type f -exec chmod u+w {} + \
+    && LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONPATH=/store/ doc2dash -n Rocq -i ./ide/rocqide/coq.png \
+         --parser coq_parser.RocqSphinxParser _build/default/doc/refman-html
