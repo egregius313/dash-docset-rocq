@@ -21,8 +21,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install NuShell
-        run: cargo install nu --locked --version 0.116.1
+      # - name: Install NuShell
+      #   run: cargo install nu --locked --version 0.116.1
+
+      - name: Setup Nushell
+        uses: hustcer/setup-nu@v3.28
+        with:
+          version: "0.116.1" # Use '*' for latest, or specify semver like '0.101.0'
+          enable-plugins: true
 
       - name: Determine Rocq version
         id: version
