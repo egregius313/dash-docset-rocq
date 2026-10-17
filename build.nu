@@ -74,3 +74,13 @@ def main [rocq_ver: string = "9.2.0"] {
   print "Note: this script does not delete the container image"
   print $"Execute '($container_engine) rmi ($image)' manually to remove it"
 }
+
+# Remove images created by the docset build.
+def "main clean" [] {
+  let container_engine = get container-engine
+  let image_ids = (^$container_engine images --quiet rocq-docset-dash-image | lines | uniq)
+
+  for image_id in $image_ids {
+    ^$container_engine rmi $image_id
+  }
+}
