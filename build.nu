@@ -1,11 +1,11 @@
 #!/usr/bin/env nu
 
-def main [rocq_ver: string = "9.2.0"] {
-  let version_tag = ($rocq_ver | str replace -a "+" "-")
-  let image = $"rocq-docset-dash-image:($version_tag)"
-  let container = $"rocq-docset-dash-container-($version_tag)"
-  let target = (["build" $"dash-docset-rocq-($version_tag)"] | path join)
-  let docset = ([$target "Rocq.docset"] | path join)
+# Determine the container engine to use
+# Available options: docker, podman
+#
+# Environment Variables:
+#   $env.CONTAINER_ENGINE (string, optional) specified preferred container engine
+export def "get container-engine" [] : nothing -> string {
   let configured_engine = ($env.CONTAINER_ENGINE? | default "")
   let container_engine = if not ($configured_engine | is-empty) {
     $configured_engine
@@ -20,6 +20,22 @@ def main [rocq_ver: string = "9.2.0"] {
   if (which $container_engine | is-empty) {
     error make {msg: $"container engine '($container_engine)' is not available"}
   }
+
+  $container_engine
+}
+
+# Build a Dash docset for Rocq
+#
+# Environment Variables:
+#   $env.CONTAINER_ENGINE (string, optional) specified preferred container engine
+def main [rocq_ver: string = "9.2.0"] {
+  let version_tag = ($rocq_ver | str replace -a "+" "-")
+  let image = $"rocq-docset-dash-image:($version_tag)"
+  let container = $"rocq-docset-dash-container-($version_tag)"
+  let target = (["build" $"dash-docset-rocq-($version_tag)"] | path join)
+  let docset = ([$target "Rocq.docset"] | path join)
+
+  let container_engine = get container-engine
 
   cd ($env.FILE_PWD? | default $env.PWD)
 
